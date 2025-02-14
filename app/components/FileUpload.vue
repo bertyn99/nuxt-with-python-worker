@@ -1,0 +1,111 @@
+<template>
+  <div class="max-w-xl mx-auto p-6">
+    <div class="mb-6">
+      <label class="block text-gray-700 text-sm font-bold mb-2">
+        Upload PDF
+      </label>
+      <input
+        type="file"
+        accept=".pdf"
+        @change="handleFileUpload"
+        class="hidden"
+        ref="fileInput"
+      />
+      <button
+        @click="$refs.fileInput.click()"
+        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+      >
+        Select PDF
+      </button>
+      <span v-if="selectedFile" class="ml-3 text-gray-600">
+        {{ selectedFile.name }}
+      </span>
+    </div>
+
+    <button
+      @click="uploadFile"
+      :disabled="!selectedFile || isUploading"
+      class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
+    >
+      {{ isUploading ? 'Uploading...' : 'Upload' }}
+    </button>
+
+    <div v-if="jobId" class="mt-6">
+      <div class="text-gray-700">Job ID: {{ jobId }}</div>
+      <div class="text-gray-700">Status: {{ status }}</div>
+      <div v-if="progress" class="mt-2">
+        <div class="w-full bg-gray-200 rounded-full h-2.5">
+          <div 
+            class="bg-blue-600 h-2.5 rounded-full" 
+            :style="{ width: `${progress}%` }"
+          ></div>
+        </div>
+        <div class="text-sm text-gray-600 mt-1">{{ progress }}%</div>
+      </div>
+    </div>
+
+    <div v-if="result" class="mt-6">
+      <h3 class="text-lg font-bold mb-2">Results:</h3>
+      <pre class="bg-gray-100 p-4 rounded">{{ result }}</pre>
+    </div>
+  </div>
+</template>
+
+<script setup>
+const fileInput = ref(null)
+const selectedFile = ref(null)
+const isUploading = ref(false)
+const jobId = ref(null)
+const status = ref('')
+const progress = ref(0)
+const result = ref(null)
+
+const handleFileUpload = (event) => {
+  selectedFile.value = event.target.files[0]
+}
+
+const uploadFile = async () => {
+  if (!selectedFile.value) return
+
+  isUploading.value = true
+  const formData = new FormData()
+  formData.append('file', selectedFile.value)
+
+  try {
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData
+    })
+    const data = await response.json()
+    jobId.value = data.jobId
+    status.value = 'Processing'
+    
+    // Set up SSE connection
+    const eventSource = new EventSource(`/api/status/${data.jobId}`)
+    
+    eventSource.onmessage = (event) => {
+      const eventData = JSON.parse(event.data)
+      status.value = eventData.status
+      progress.value = eventData.progress || 0
+      
+      if (eventData.status === 'completed') {
+        result.value = eventData.result
+        eventSource.close()
+      } else if (eventData.status === 'failed') {
+        status.value = 'Failed: ' + eventData.error
+        eventSource.close()
+      }
+    }
+    
+    eventSource.onerror = () => {
+      eventSource.close()
+      status.value = 'Error occurred'
+    }
+  } catch (error) {
+    console.error('Upload error:', error)
+    status.value = 'Error'
+  } finally {
+    isUploading.value = false
+  }
+}
+</script>

@@ -1,0 +1,11 @@
+[project]
+name = "worker"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "asyncio>=3.4.3",
+    "bullmq>=1.6.0",
+    "pymupdf4llm>=0.0.17",
+]
