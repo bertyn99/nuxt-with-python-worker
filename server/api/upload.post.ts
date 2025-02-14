@@ -2,7 +2,7 @@ import { defineEventHandler, readBody } from 'h3'
 import { pdfQueue } from '../utils/queue'
 
 export default defineEventHandler(async (event) => {
-  const formData = await readBody(event)
+  const formData = await readFormData(event)
   const file = formData.get('file')
   
   // Add job to BullMQ queue
