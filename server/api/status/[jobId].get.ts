@@ -1,64 +1,109 @@
-import { defineEventHandler } from 'h3'
+import { defineEventHandler, createError, getRouterParam, createEventStream } from 'h3'
 import { pdfQueue } from '../../utils/queue'
+import { Job } from 'bullmq'
 
 export default defineEventHandler(async (event) => {
-  const jobId =getRouterParam(event,'jobId')
+  // Enable SSE endpoint
+  setHeader(event, 'cache-control', 'no-cache')
+  setHeader(event, 'connection', 'keep-alive')
+  setHeader(event, 'content-type', 'text/event-stream')
+  setResponseStatus(event, 200)
+
+  const jobId = getRouterParam(event, 'jobId')
+
+
+  if (!jobId) throw createError({ status: 400, statusText: 'jobId is required' })
+
   
-    if(!jobId) throw createError( 'jobId is required',400)
 
-  // Set headers for SSE
-  event.node.res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive'
-  })
-
-  const job = await pdfQueue.getJob(jobId)
+  const job = await pdfQueue.getJob(jobId) as Job
   if (!job) {
-    event.node.res.write(`data: ${JSON.stringify({ status: 'not_found' })}\n\n`)
-    event.node.res.end()
-    return
+     event.node.res.write(`data: ${JSON.stringify({ status: 'not_found' })}\n\n`)
+    return event.node.res.end()
   }
 
   // Send initial status
   const initialState = await job.getState()
-  event.node.res.write(`data: ${JSON.stringify({ 
-    status: initialState,
-    progress: await job.progress()
-  })}\n\n`)
-
-  // Subscribe to job events
-  const cleanup = await pdfQueue.on('global:completed', async (jobId, result) => {
+  console.log('init')
+  try {
+    event.node.res.write(`data: ${JSON.stringify({ 
+      status: initialState,
+      progress: job.progress
+    })}\n\n`)
+  } catch (error) {
+    console.error('Error sending initial state:', error)
+  }
+// Event listeners
+  const completedMessage =  (jobId: string, result: any) => {
     if (jobId === job.id) {
-      event.node.res.write(`data: ${JSON.stringify({
-        status: 'completed',
-        result: JSON.parse(result)
-      })}\n\n`)
-      event.node.res.end()
+      console.log('completed')
+      try {
+         event.node.res.write(`data: ${JSON.stringify({
+          status: 'completed',
+          result: JSON.parse(result)
+        })}\n\n`)
+      } catch (error) {
+        console.error('Error sending completed event:', error)
+      }
     }
-  })
+  }
 
-  pdfQueue.on('global:failed', async (jobId, error) => {
+  const failedMessage =  (jobId: string, error: any) => {
     if (jobId === job.id) {
-      event.node.res.write(`data: ${JSON.stringify({
-        status: 'failed',
-        error: error.message
-      })}\n\n`)
-      event.node.res.end()
+      console.log('failed')
+      try {
+         event.node.res.write(`data: ${JSON.stringify({
+          status: 'failed',
+          error: error.message
+        })}\n\n`)
+      } catch (pushError) {
+        console.error('Error sending failed event:', pushError)
+      }
     }
-  })
+  }
 
-  pdfQueue.on('global:progress', async (jobId, progress) => {
+  const progressMessage =  (jobId: string, progress: number|object) => {
+    console.log('progressed before:', progress)
     if (jobId === job.id) {
-      event.node.res.write(`data: ${JSON.stringify({
-        status: 'processing',
-        progress
-      })}\n\n`)
+      console.log('progressed:', progress)
+      try {
+         event.node.res.write(`data: ${JSON.stringify({
+          status: 'processing',
+          progress
+        })}\n\n`)
+      } catch (error) {
+        console.error('Error sending progress event:', error)
+      }
     }
-  })
+  }
 
-  // Clean up on client disconnect
-  event.node.req.on('close', () => {
-    cleanup()
+  
+  const handleJobUpdate=async()=>{
+    const currState= await job.getState()
+    const tmpJob = await pdfQueue.getJob(jobId) as Job
+    switch (currState) {
+      case "active":
+        //get the progress value 
+        tmpJob.progress==100? completedMessage(jobId,tmpJob.returnvalue):progressMessage(jobId,tmpJob.progress)
+        break;
+
+      case "failed":
+        failedMessage(jobId,tmpJob.failedReason)
+        break;
+    
+      default:
+        break;
+    }
+  }
+
+    const interval = setInterval(async () => {
+      await handleJobUpdate()
+    }, 2000);
+
+  event._handled = true;
+
+   // Clean up on client disconnect
+   event.node.req.on('close', () => {
+    clearInterval(interval);
   })
 })

@@ -4,17 +4,9 @@
       <label class="block text-gray-700 text-sm font-bold mb-2">
         Upload PDF
       </label>
-      <input
-        type="file"
-        accept=".pdf"
-        @change="handleFileUpload"
-        class="hidden"
-        ref="fileInput"
-      />
-      <button
-        @click="$refs.fileInput.click()"
-        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-      >
+      <input type="file" accept=".pdf" @change="handleFileUpload" class="hidden" ref="fileInput" />
+      <button @click="$refs.fileInput.click()"
+        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
         Select PDF
       </button>
       <span v-if="selectedFile" class="ml-3 text-gray-600">
@@ -22,23 +14,17 @@
       </span>
     </div>
 
-    <button
-      @click="uploadFile"
-      :disabled="!selectedFile || isUploading"
-      class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
-    >
+    <button @click="uploadFile" :disabled="!selectedFile || isUploading"
+      class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50">
       {{ isUploading ? 'Uploading...' : 'Upload' }}
     </button>
 
     <div v-if="jobId" class="mt-6">
       <div class="text-gray-700">Job ID: {{ jobId }}</div>
-      <div class="text-gray-700">Status: {{ status }}</div>
+      <div class="text-gray-700">Status: {{ statusProcess }}</div>
       <div v-if="progress" class="mt-2">
         <div class="w-full bg-gray-200 rounded-full h-2.5">
-          <div 
-            class="bg-blue-600 h-2.5 rounded-full" 
-            :style="{ width: `${progress}%` }"
-          ></div>
+          <div class="bg-blue-600 h-2.5 rounded-full" :style="{ width: `${progress}%` }"></div>
         </div>
         <div class="text-sm text-gray-600 mt-1">{{ progress }}%</div>
       </div>
@@ -56,9 +42,10 @@ const fileInput = ref(null)
 const selectedFile = ref(null)
 const isUploading = ref(false)
 const jobId = ref(null)
-const status = ref('')
+const statusProcess = ref('')
 const progress = ref(0)
 const result = ref(null)
+
 
 const handleFileUpload = (event) => {
   selectedFile.value = event.target.files[0]
@@ -76,34 +63,28 @@ const uploadFile = async () => {
       method: 'POST',
       body: formData
     })
-    const data = await response.json()
-    jobId.value = data.jobId
-    status.value = 'Processing'
-    
+    const dataRes = await response.json()
+    jobId.value = dataRes.jobId
+    statusProcess.value = 'Processing'
+
     // Set up SSE connection
-    const eventSource = new EventSource(`/api/status/${data.jobId}`)
-    
-    eventSource.onmessage = (event) => {
-      const eventData = JSON.parse(event.data)
-      status.value = eventData.status
-      progress.value = eventData.progress || 0
-      
-      if (eventData.status === 'completed') {
-        result.value = eventData.result
-        eventSource.close()
-      } else if (eventData.status === 'failed') {
-        status.value = 'Failed: ' + eventData.error
-        eventSource.close()
-      }
-    }
-    
-    eventSource.onerror = () => {
-      eventSource.close()
-      status.value = 'Error occurred'
-    }
+    const { status, data, error, close } = useEventSource(`api/status/${jobId.value}`)
+    console.log(data.value)
+    console.log(status.value)
+    watch(() => data.value, (newVal) => {
+      console.log(newVal)
+      result.value = newVal
+    })
+
+    watch(status, (newVal) => {
+      statusProcess.value = newVal
+      console.log(newVal)
+    })
+
+
   } catch (error) {
     console.error('Upload error:', error)
-    status.value = 'Error'
+    statusProcess.value = 'Error'
   } finally {
     isUploading.value = false
   }

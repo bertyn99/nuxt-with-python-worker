@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@nuxt/ui": "3.0.0-alpha.12",
+    "@vueuse/nuxt": "12.6.1",
     "bullmq": "^5.40.4",
     "nuxt": "^3.15.4",
     "tailwindcss": "^4.0.6",
@@ -18,6 +19,10 @@
     "vue-router": "latest"
   },
   "devDependencies": {
-    "@tailwindcss/typography": "^0.5.16"
+    "@tailwindcss/typography": "^0.5.16",
+    "@vueuse/core": "^12.7.0"
+  },
+  "resolutions": {
+    "h3": "npm:h3-nightly@latest"
   }
 }
