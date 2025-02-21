@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@nuxt/content": "^3.1.1",
     "@nuxt/ui": "3.0.0-alpha.12",
     "@vueuse/nuxt": "12.6.1",
     "bullmq": "^5.40.4",

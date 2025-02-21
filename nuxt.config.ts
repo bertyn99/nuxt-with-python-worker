@@ -6,8 +6,14 @@ export default defineNuxtConfig({
   nitro: {
     experimental: {
       websocket: true,
+    },
+    storage:{
+      local:{
+          driver: 'fs',
+          base: './.data/file'
+      }
     }
   },
-  modules: ["@nuxt/ui", "@vueuse/nuxt"],
+  modules: ["@nuxt/ui", "@vueuse/nuxt",'@nuxt/content'],
   devtools: { enabled: true },
 });

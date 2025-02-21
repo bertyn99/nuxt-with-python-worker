@@ -32,7 +32,9 @@
 
     <div v-if="result" class="mt-6">
       <h3 class="text-lg font-bold mb-2">Results:</h3>
-      <pre class="bg-gray-100 p-4 rounded">{{ result }}</pre>
+
+      <MDC :value="contentResult" tag="article" />
+
     </div>
   </div>
 </template>
@@ -45,7 +47,9 @@ const jobId = ref(null)
 const statusProcess = ref('')
 const progress = ref(0)
 const result = ref(null)
+const toast = useToast()
 
+const contentResult = computed(() => result.value?.result?.details ?? 'none')
 
 const handleFileUpload = (event) => {
   selectedFile.value = event.target.files[0]
@@ -72,8 +76,15 @@ const uploadFile = async () => {
     console.log(data.value)
     console.log(status.value)
     watch(() => data.value, (newVal) => {
-      console.log(newVal)
-      result.value = newVal
+
+      result.value = JSON.parse(newVal)
+      if (result.value?.status == "completed") {
+        toast.add({
+          title: 'Success',
+          description: result.value.result.message,
+          color: 'success'
+        })
+      }
     })
 
     watch(status, (newVal) => {
