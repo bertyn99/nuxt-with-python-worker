@@ -82,22 +82,14 @@ async def process_pdf(job: Job, job_token: str):
             raise Exception(f"File not found at: {absolute_path}")
         
         ## For this example we will process only pdf file
-    
+
         # Try to open the file to verify access
         try:
             with open(absolute_path, 'rb') as file:
                 # Now use the absolute path for your PDF processing
-                # Capture stdout during markdown conversion
-                """  with capture_stdout() as output: """
+                await job.updateProgress(25)
                 md_text = pymupdf4llm.to_markdown(absolute_path)
                     
-                    # Get captured output and check for progress
-                """    log_output = output.getvalue()
-                    progress = parse_progress(log_output) """
-                    
-                    # Update job progress
-                """  if progress > 0:
-                        await job.updateProgress(progress) """
         
         except PermissionError:
             raise Exception(f"Permission denied accessing file: {absolute_path}")
