@@ -1,4 +1,4 @@
-import { Queue } from 'bullmq'
+import { Queue, QueueEvents } from 'bullmq'
 
 const connection = {
   host: process.env.REDIS_HOST || 'localhost',
@@ -15,3 +15,5 @@ export const pdfQueue = new Queue('pdf-processing', {
     },
   },
 })
+
+export const pdfQueueEvents= new QueueEvents('pdf-processing',{connection:pdfQueue.opts.connection})
